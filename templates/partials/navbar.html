@@ -1,0 +1,18 @@
+<header class="navbar">
+  <div class="navbar-inner">
+    <a href="/" class="logo">kararsızım<span class="logo-q">?</span></a>
+    <nav class="nav-actions">
+      {% if user.is_authenticated %}
+        <a href="/anket/olustur/" class="btn btn-primary btn-sm">+ Anket oluştur</a>
+        <a href="/u/{{ user.username }}/" class="nav-user">@{{ user.username }}</a>
+        <form method="post" action="/cikis/" class="inline-form">
+          {% csrf_token %}
+          <button type="submit" class="btn btn-ghost btn-sm">Çıkış</button>
+        </form>
+      {% else %}
+        <a href="/giris/" class="btn btn-ghost btn-sm">Giriş yap</a>
+        <a href="/kayit/" class="btn btn-primary btn-sm">Kayıt ol</a>
+      {% endif %}
+    </nav>
+  </div>
+</header>
