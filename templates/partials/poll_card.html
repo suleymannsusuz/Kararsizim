@@ -1,0 +1,50 @@
+{% load humanize %}
+<article class="card poll-card">
+  <header class="poll-meta">
+    <span class="avatar" aria-hidden="true">{{ poll.author.username|slice:":1"|upper }}</span>
+    <span class="poll-author">@{{ poll.author.username }}</span>
+    <span class="muted">· {{ poll.created_at|naturaltime }}</span>
+  </header>
+
+  <h2 class="poll-question">{{ poll.question }}</h2>
+
+  {% if poll.show_results %}
+    <ul class="results">
+      {% for result in poll.results %}
+        <li class="result opt-{{ result.option.position }}">
+          <div class="result-head">
+            <span class="result-text">
+              {{ result.option.text }}
+              {% if result.is_mine %}<span class="mine" title="Senin oyun">✓ <span class="sr-only">Senin oyun</span></span>{% endif %}
+            </span>
+            <span class="result-percent">%{{ result.percent }} <span class="muted">({{ result.votes }})</span></span>
+          </div>
+          <div class="bar"><span class="bar-fill" style="width: {{ result.percent }}%"></span></div>
+        </li>
+      {% endfor %}
+    </ul>
+  {% else %}
+    <form method="post" action="{% url 'poll_vote' poll.pk %}" class="vote-form">
+      {% csrf_token %}
+      {% for result in poll.results %}
+        <button type="submit" name="option" value="{{ result.option.pk }}" class="option-btn opt-{{ result.option.position }}">
+          {{ result.option.text }}
+        </button>
+      {% endfor %}
+    </form>
+  {% endif %}
+
+  <footer class="poll-footer">
+    <span class="muted">{{ poll.total_votes }} oy</span>
+    {% if detail %}
+      {% if poll.is_owner %}
+        <form method="post" action="{% url 'poll_delete' poll.pk %}" class="inline-form">
+          {% csrf_token %}
+          <button type="submit" class="btn btn-ghost btn-sm btn-danger-text">Anketi sil</button>
+        </form>
+      {% endif %}
+    {% else %}
+      <a href="{% url 'poll_detail' poll.pk %}" class="poll-link">Detay →</a>
+    {% endif %}
+  </footer>
+</article>

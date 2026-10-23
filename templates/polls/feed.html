@@ -1,0 +1,14 @@
+{% extends "base.html" %}
+
+{% block content %}
+  {% for poll in page.object_list %}
+    {% include "partials/poll_card.html" %}
+  {% empty %}
+    <section class="card empty-state">
+      <h1 class="card-title">Henüz anket yok</h1>
+      <p class="muted">Kararsız kaldığın bir şey varsa, ilk soruyu sen sor.</p>
+      <a href="{% url 'poll_create' %}" class="btn btn-primary">İlk anketi sen oluştur</a>
+    </section>
+  {% endfor %}
+  {% include "partials/pagination.html" %}
+{% endblock %}

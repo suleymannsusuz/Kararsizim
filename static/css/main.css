@@ -214,6 +214,148 @@ img, svg { max-width: 100%; }
 
 .form-alt { margin-top: 20px; text-align: center; }
 
+fieldset.option-fields {
+  margin: 0 0 16px;
+  padding: 0;
+  border: 0;
+}
+
+.option-fields legend {
+  margin-bottom: 8px;
+  padding: 0;
+  font-weight: 600;
+}
+
+.option-fields .form-field { margin-bottom: 10px; }
+
+.option-fields .form-field label {
+  font-weight: 400;
+  font-size: 0.85rem;
+  color: var(--text-muted);
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* Anket kartı */
+.opt-0 { --c: var(--opt-1); }
+.opt-1 { --c: var(--opt-2); }
+.opt-2 { --c: var(--opt-3); }
+.opt-3 { --c: var(--opt-4); }
+.opt-4 { --c: var(--opt-5); }
+
+.poll-card { margin-bottom: 20px; }
+
+.poll-meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 12px;
+  font-size: 0.9rem;
+}
+
+.poll-author { font-weight: 600; }
+
+.avatar {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: var(--primary);
+  color: #fff;
+  font-weight: 800;
+}
+
+.poll-question {
+  margin-bottom: 16px;
+  font-size: 1.3rem;
+  font-weight: 700;
+  line-height: 1.3;
+  overflow-wrap: anywhere;
+}
+
+.vote-form { display: grid; gap: 10px; }
+
+.option-btn {
+  width: 100%;
+  padding: 14px 18px;
+  border: 1.5px solid color-mix(in srgb, var(--c) 40%, transparent);
+  border-radius: var(--radius);
+  background: color-mix(in srgb, var(--c) 12%, white);
+  color: var(--text);
+  font: inherit;
+  font-weight: 600;
+  text-align: left;
+  cursor: pointer;
+  overflow-wrap: anywhere;
+  transition: transform 0.15s ease, background 0.15s ease;
+}
+
+.option-btn:hover { transform: translateY(-1px); background: color-mix(in srgb, var(--c) 20%, white); }
+
+.results { list-style: none; margin: 0; padding: 0; display: grid; gap: 14px; }
+
+.result-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 6px;
+  font-weight: 600;
+}
+
+.result-text { overflow-wrap: anywhere; }
+.result-percent { white-space: nowrap; }
+.mine { color: var(--success); }
+
+.bar {
+  height: 12px;
+  border-radius: 999px;
+  background: var(--border);
+  overflow: hidden;
+}
+
+.bar-fill {
+  display: block;
+  height: 100%;
+  border-radius: 999px;
+  background: var(--c);
+}
+
+.poll-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 18px;
+  font-size: 0.9rem;
+}
+
+.poll-link { font-weight: 600; text-decoration: none; }
+
+.btn-danger-text { color: var(--danger); }
+
+.empty-state { text-align: center; }
+.empty-state .btn { margin-top: 16px; }
+
+.back-link { text-align: center; }
+
+.pagination {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
 /* Bildirimler */
 .messages { list-style: none; margin: 0 0 16px; padding: 0; }
 

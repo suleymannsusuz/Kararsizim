@@ -1,0 +1,40 @@
+{% extends "base.html" %}
+
+{% block title %}Anket oluştur · kararsızım{% endblock %}
+
+{% block content %}
+  <section class="card">
+    <h1 class="card-title">Anket oluştur</h1>
+    <p class="muted">2 ile 5 arasında seçenek ekle. Anket yayınlandıktan sonra düzenlenemez.</p>
+    <form method="post" class="form" novalidate>
+      {% csrf_token %}
+
+      <div class="form-field">
+        <label for="{{ form.question.id_for_label }}">{{ form.question.label }}</label>
+        {{ form.question }}
+        {% if form.question.errors %}
+          <ul class="errorlist" role="alert">
+            {% for error in form.question.errors %}<li>{{ error }}</li>{% endfor %}
+          </ul>
+        {% endif %}
+      </div>
+
+      <fieldset class="option-fields">
+        <legend>Seçenekler</legend>
+        {% for value in form.option_rows %}
+          <div class="form-field">
+            <label for="id_option_{{ forloop.counter }}">Seçenek {{ forloop.counter }}</label>
+            <input type="text" name="options" id="id_option_{{ forloop.counter }}" value="{{ value }}" maxlength="60">
+          </div>
+        {% endfor %}
+        {% if form.non_field_errors %}
+          <ul class="errorlist" role="alert">
+            {% for error in form.non_field_errors %}<li>{{ error }}</li>{% endfor %}
+          </ul>
+        {% endif %}
+      </fieldset>
+
+      <button type="submit" class="btn btn-primary btn-block">Anketi yayınla</button>
+    </form>
+  </section>
+{% endblock %}
