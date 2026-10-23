@@ -340,3 +340,222 @@ class EmailPrivacyTests(TestCase):
                     self.assertEqual(response.status_code, 200)
                     self.assertNotIn("gizli@example.com", html)
                     self.assertIsNone(re.search(r"[\w.+-]+@[\w-]+\.[a-z]{2,}", html))
+
+
+JSON = {"HTTP_ACCEPT": "application/json"}
+
+
+class JsonVoteTests(TestCase):
+    def setUp(self):
+        self.author = make_user("yazar", "yazar.gizli@example.com")
+        self.poll = make_poll(self.author, options=("Sinema", "Restoran", "Evde kal"))
+        self.sinema, self.restoran, self.evde = self.poll.options.all()
+        self.url = reverse("poll_vote", args=[self.poll.pk])
+
+    def post(self, option_id, client=None):
+        return (client or self.client).post(self.url, {"option": option_id}, **JSON)
+
+    def test_successful_vote_returns_200_with_results(self):
+        Vote.objects.create(poll=self.poll, option=self.restoran, voter_key="a:1")
+        response = self.post(self.sinema.pk)
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response["Content-Type"], "application/json")
+        data = response.json()
+        self.assertTrue(data["ok"])
+        self.assertEqual(data["total"], 2)
+        self.assertEqual(data["voted_option_id"], self.sinema.pk)
+        self.assertEqual(
+            [(r["option_id"], r["text"], r["votes"], r["percent"]) for r in data["results"]],
+            [(self.sinema.pk, "Sinema", 1, 50), (self.restoran.pk, "Restoran", 1, 50), (self.evde.pk, "Evde kal", 0, 0)],
+        )
+        self.assertEqual([r["position"] for r in data["results"]], [0, 1, 2])
+        self.assertEqual(Vote.objects.count(), 2)
+
+    def test_guest_json_vote_sets_cookie_and_second_vote_is_409_with_results(self):
+        self.assertEqual(self.post(self.sinema.pk).status_code, 200)
+        self.assertIn(COOKIE_NAME, self.client.cookies)
+        response = self.post(self.restoran.pk)
+        self.assertEqual(response.status_code, 409)
+        data = response.json()
+        self.assertFalse(data["ok"])
+        self.assertEqual(data["error"], "Bu ankete zaten oy verdin.")
+        self.assertEqual(data["voted_option_id"], self.sinema.pk)
+        self.assertEqual(data["total"], 1)
+        self.assertEqual(Vote.objects.count(), 1)
+
+    def test_member_json_vote(self):
+        voter = make_user("oyuncu")
+        self.client.force_login(voter)
+        self.assertEqual(self.post(self.evde.pk).status_code, 200)
+        self.assertEqual(self.post(self.sinema.pk).status_code, 409)
+        self.assertEqual(Vote.objects.get().user, voter)
+        self.assertNotIn(COOKIE_NAME, self.client.cookies)
+
+    def test_invalid_option_returns_400(self):
+        other = make_poll(self.author, question="Başka bir anket?", options=("A", "B"))
+        for option_id in ("", "abc", "99999", other.options.first().pk):
+            with self.subTest(option_id=option_id):
+                response = self.post(option_id)
+                self.assertEqual(response.status_code, 400)
+                self.assertEqual(response.json(), {"ok": False, "error": "Geçersiz seçenek."})
+        self.assertEqual(Vote.objects.count(), 0)
+        self.assertNotIn(COOKIE_NAME, self.client.cookies)
+
+    def test_json_never_contains_email(self):
+        self.client.force_login(make_user("oyuncu", "oyuncu.gizli@example.com"))
+        for response in (self.post(self.sinema.pk), self.post(self.sinema.pk), self.post("abc")):
+            self.assertNotIn("@", response.content.decode())
+
+    def test_without_json_accept_header_still_redirects(self):
+        response = self.client.post(self.url, {"option": self.sinema.pk})
+        self.assertRedirects(response, reverse("poll_detail", args=[self.poll.pk]))
+
+    def test_csrf_is_enforced_for_json_requests(self):
+        from django.test import Client
+
+        client = Client(enforce_csrf_checks=True)
+        response = client.post(self.url, {"option": self.sinema.pk}, **JSON)
+        self.assertEqual(response.status_code, 403)
+        self.assertEqual(Vote.objects.count(), 0)
+
+
+class PopularSortTests(TestCase):
+    def setUp(self):
+        author = make_user()
+        self.quiet = make_poll(author, question="Sessiz anket burada?")
+        self.hot = make_poll(author, question="Popüler anket burada?")
+        self.warm = make_poll(author, question="Ilık anket burada?")
+        self.newest = make_poll(author, question="En yeni anket burada?")
+        for index in range(3):
+            Vote.objects.create(poll=self.hot, option=self.hot.options.first(), voter_key=f"a:h{index}")
+        Vote.objects.create(poll=self.warm, option=self.warm.options.first(), voter_key="a:w")
+
+    def questions(self, query=""):
+        response = self.client.get(reverse("home") + query)
+        return [poll.question for poll in response.context["page"].object_list]
+
+    def test_default_is_newest_first(self):
+        self.assertEqual(
+            self.questions(),
+            ["En yeni anket burada?", "Ilık anket burada?", "Popüler anket burada?", "Sessiz anket burada?"],
+        )
+
+    def test_popular_orders_by_vote_count_then_recency(self):
+        self.assertEqual(
+            self.questions("?sirala=populer"),
+            ["Popüler anket burada?", "Ilık anket burada?", "En yeni anket burada?", "Sessiz anket burada?"],
+        )
+
+    def test_unknown_sort_value_falls_back_to_newest(self):
+        self.assertEqual(self.questions("?sirala=bilinmeyen"), self.questions())
+
+    def test_tabs_mark_active_sort(self):
+        self.assertContains(self.client.get(reverse("home")), 'class="tab is-active" aria-current="page">Yeni')
+        self.assertContains(
+            self.client.get(reverse("home") + "?sirala=populer"), 'class="tab is-active" aria-current="page">Popüler'
+        )
+
+    def test_pagination_links_keep_sort(self):
+        author = make_user("baska")
+        for index in range(20):
+            make_poll(author, question=f"Ek anket numarası {index:02d}?")
+        response = self.client.get(reverse("home") + "?sirala=populer")
+        self.assertContains(response, "?sayfa=2&amp;sirala=populer")
+        response = self.client.get(reverse("home") + "?sayfa=2&sirala=populer")
+        self.assertContains(response, "?sayfa=1&amp;sirala=populer")
+
+    def test_popular_query_count_is_constant(self):
+        author = make_user("baska")
+
+        def count_queries():
+            with CaptureQueriesContext(connection) as queries:
+                self.assertEqual(self.client.get(reverse("home") + "?sirala=populer").status_code, 200)
+            return len(queries)
+
+        few = count_queries()
+        for index in range(10):
+            make_poll(author, question=f"Ek anket numarası {index:02d}?")
+        self.assertEqual(count_queries(), few)
+
+
+class UserPollsPageTests(TestCase):
+    def setUp(self):
+        self.ali = make_user("ali.veli", "ali.gizli@example.com")
+        self.ayse = make_user("ayse")
+        self.ali_poll = make_poll(self.ali, question="Alinin anketi burada?")
+        self.ayse_poll = make_poll(self.ayse, question="Ayşenin anketi burada?")
+
+    def test_shows_only_that_users_polls(self):
+        response = self.client.get(reverse("user_polls", args=["ali.veli"]))
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "@ali.veli")
+        self.assertContains(response, "Alinin anketi burada?")
+        self.assertNotContains(response, "Ayşenin anketi burada?")
+        self.assertContains(response, "1 anket")
+
+    def test_username_lookup_is_case_insensitive(self):
+        self.assertEqual(self.client.get("/u/ALI.Veli/").status_code, 200)
+
+    def test_unknown_user_is_404(self):
+        self.assertEqual(self.client.get("/u/yok_boyle_biri/").status_code, 404)
+
+    def test_user_without_polls_shows_empty_state(self):
+        make_user("bos")
+        self.assertContains(self.client.get("/u/bos/"), "henüz bir anket oluşturmamış")
+
+    def test_page_shows_username_but_never_email(self):
+        html = self.client.get("/u/ali.veli/").content.decode()
+        self.assertNotIn("ali.gizli@example.com", html)
+        self.assertIsNone(re.search(r"[\w.+-]+@[\w-]+\.[a-z]{2,}", html))
+
+    def test_poll_cards_link_author_names_to_user_page(self):
+        for url in (reverse("home"), reverse("poll_detail", args=[self.ali_poll.pk])):
+            self.assertContains(self.client.get(url), 'href="/u/ali.veli/"')
+
+    def test_voting_state_is_respected_on_user_page(self):
+        self.client.post(reverse("poll_vote", args=[self.ali_poll.pk]), {"option": self.ali_poll.options.first().pk})
+        response = self.client.get("/u/ali.veli/")
+        self.assertContains(response, 'class="bar"', count=2)
+
+    def test_deleted_polls_disappear_from_user_page(self):
+        self.client.force_login(self.ali)
+        self.client.post(reverse("poll_delete", args=[self.ali_poll.pk]))
+        self.assertContains(self.client.get("/u/ali.veli/"), "0 anket")
+
+
+class UiDetailTests(TestCase):
+    def test_avatar_color_is_deterministic_and_username_based(self):
+        from .templatetags.poll_extras import avatar_color
+
+        self.assertEqual(avatar_color("ali"), avatar_color("ali"))
+        self.assertNotEqual(avatar_color("ali"), avatar_color("ayse"))
+        self.assertRegex(avatar_color("ali"), r"^hsl\(\d{1,3} 65% 38%\)$")
+
+    def test_avatar_color_is_applied_on_cards(self):
+        from .templatetags.poll_extras import avatar_color
+
+        make_poll(make_user("renkli"))
+        self.assertContains(self.client.get(reverse("home")), f"background: {avatar_color('renkli')}")
+
+    def test_delete_form_has_confirmation_prompt(self):
+        author = make_user()
+        poll = make_poll(author)
+        self.client.force_login(author)
+        response = self.client.get(reverse("poll_detail", args=[poll.pk]))
+        self.assertContains(response, "data-confirm=")
+
+    def test_create_form_exposes_counter_and_option_rows_for_js(self):
+        self.client.force_login(make_user())
+        response = self.client.get(reverse("poll_create"))
+        self.assertContains(response, 'data-counter="140"')
+        self.assertContains(response, "data-option-row", count=5)
+        self.assertContains(response, "data-poll-form")
+
+    def test_card_has_status_region_and_total_hook_for_js(self):
+        make_poll(make_user())
+        response = self.client.get(reverse("home"))
+        self.assertContains(response, 'role="status"')
+        self.assertContains(response, "js-total")
+
+    def test_favicon_is_linked(self):
+        self.assertContains(self.client.get(reverse("home")), "img/favicon.svg")

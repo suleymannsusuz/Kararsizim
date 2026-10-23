@@ -19,7 +19,12 @@ class PollForm(forms.Form):
     kırpılmaz, reddedilir.
     """
 
-    question = forms.CharField(label="Soru", min_length=5, max_length=140)
+    question = forms.CharField(
+        label="Soru",
+        min_length=5,
+        max_length=140,
+        widget=forms.TextInput(attrs={"data-counter": "140"}),
+    )
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)

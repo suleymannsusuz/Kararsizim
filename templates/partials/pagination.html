@@ -1,13 +1,13 @@
 {% if page.has_other_pages %}
   <nav class="pagination" aria-label="Sayfalama">
     {% if page.has_previous %}
-      <a href="?sayfa={{ page.previous_page_number }}" class="btn btn-ghost btn-sm" rel="prev">← Yeni anketler</a>
+      <a href="?sayfa={{ page.previous_page_number }}{{ extra_qs }}" class="btn btn-ghost btn-sm" rel="prev">← Önceki</a>
     {% else %}
       <span></span>
     {% endif %}
     <span class="muted">Sayfa {{ page.number }} / {{ page.paginator.num_pages }}</span>
     {% if page.has_next %}
-      <a href="?sayfa={{ page.next_page_number }}" class="btn btn-ghost btn-sm" rel="next">Eski anketler →</a>
+      <a href="?sayfa={{ page.next_page_number }}{{ extra_qs }}" class="btn btn-ghost btn-sm" rel="next">Sonraki →</a>
     {% else %}
       <span></span>
     {% endif %}

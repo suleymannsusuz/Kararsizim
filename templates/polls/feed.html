@@ -1,6 +1,11 @@
 {% extends "base.html" %}
 
 {% block content %}
+  <nav class="tabs" aria-label="Sıralama">
+    <a href="{% url 'home' %}" class="tab{% if not sort %} is-active{% endif %}"{% if not sort %} aria-current="page"{% endif %}>Yeni</a>
+    <a href="{% url 'home' %}?sirala=populer" class="tab{% if sort %} is-active{% endif %}"{% if sort %} aria-current="page"{% endif %}>Popüler</a>
+  </nav>
+
   {% for poll in page.object_list %}
     {% include "partials/poll_card.html" %}
   {% empty %}

@@ -1,0 +1,24 @@
+{% extends "base.html" %}
+{% load poll_extras %}
+
+{% block title %}@{{ profile.username }} · kararsızım{% endblock %}
+
+{% block content %}
+  <header class="profile-head">
+    <span class="avatar avatar-lg" style="background: {{ profile.username|avatar_color }}" aria-hidden="true">{{ profile.username|slice:":1"|upper }}</span>
+    <div>
+      <h1 class="profile-name">@{{ profile.username }}</h1>
+      <p class="muted">{{ page.paginator.count }} anket</p>
+    </div>
+  </header>
+
+  {% for poll in page.object_list %}
+    {% include "partials/poll_card.html" %}
+  {% empty %}
+    <section class="card empty-state">
+      <h2 class="card-title">Henüz anket yok</h2>
+      <p class="muted">@{{ profile.username }} henüz bir anket oluşturmamış.</p>
+    </section>
+  {% endfor %}
+  {% include "partials/pagination.html" %}
+{% endblock %}

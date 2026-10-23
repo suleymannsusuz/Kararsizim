@@ -1,8 +1,8 @@
-{% load humanize %}
+{% load humanize poll_extras %}
 <article class="card poll-card">
   <header class="poll-meta">
-    <span class="avatar" aria-hidden="true">{{ poll.author.username|slice:":1"|upper }}</span>
-    <span class="poll-author">@{{ poll.author.username }}</span>
+    <span class="avatar" style="background: {{ poll.author.username|avatar_color }}" aria-hidden="true">{{ poll.author.username|slice:":1"|upper }}</span>
+    <a href="{% url 'user_polls' poll.author.username %}" class="poll-author">@{{ poll.author.username }}</a>
     <span class="muted">· {{ poll.created_at|naturaltime }}</span>
   </header>
 
@@ -34,11 +34,13 @@
     </form>
   {% endif %}
 
+  <p class="poll-status" role="status"></p>
+
   <footer class="poll-footer">
-    <span class="muted">{{ poll.total_votes }} oy</span>
+    <span class="muted js-total">{{ poll.total_votes }} oy</span>
     {% if detail %}
       {% if poll.is_owner %}
-        <form method="post" action="{% url 'poll_delete' poll.pk %}" class="inline-form">
+        <form method="post" action="{% url 'poll_delete' poll.pk %}" class="inline-form" data-confirm="Bu anketi silmek istediğine emin misin? Bu işlem geri alınamaz.">
           {% csrf_token %}
           <button type="submit" class="btn btn-ghost btn-sm btn-danger-text">Anketi sil</button>
         </form>

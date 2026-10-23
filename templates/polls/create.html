@@ -6,7 +6,7 @@
   <section class="card">
     <h1 class="card-title">Anket oluştur</h1>
     <p class="muted">2 ile 5 arasında seçenek ekle. Anket yayınlandıktan sonra düzenlenemez.</p>
-    <form method="post" class="form" novalidate>
+    <form method="post" class="form" data-poll-form novalidate>
       {% csrf_token %}
 
       <div class="form-field">
@@ -22,9 +22,11 @@
       <fieldset class="option-fields">
         <legend>Seçenekler</legend>
         {% for value in form.option_rows %}
-          <div class="form-field">
+          <div class="form-field" data-option-row>
             <label for="id_option_{{ forloop.counter }}">Seçenek {{ forloop.counter }}</label>
-            <input type="text" name="options" id="id_option_{{ forloop.counter }}" value="{{ value }}" maxlength="60">
+            <div class="option-input-wrap">
+              <input type="text" name="options" id="id_option_{{ forloop.counter }}" value="{{ value }}" maxlength="60">
+            </div>
           </div>
         {% endfor %}
         {% if form.non_field_errors %}
