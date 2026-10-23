@@ -163,6 +163,57 @@ img, svg { max-width: 100%; }
 
 .muted { color: var(--text-muted); }
 
+.card-narrow { max-width: 440px; margin: 0 auto; }
+
+/* Formlar */
+.form { margin-top: 20px; }
+
+.form-field { margin-bottom: 16px; }
+
+.form-field label {
+  display: block;
+  margin-bottom: 6px;
+  font-weight: 600;
+}
+
+.form-field input[type="text"],
+.form-field input[type="email"],
+.form-field input[type="password"] {
+  width: 100%;
+  padding: 12px 14px;
+  border: 1.5px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+  color: var(--text);
+  font: inherit;
+}
+
+.form-field input:focus-visible {
+  border-color: var(--primary);
+  outline-offset: 0;
+}
+
+.help-text {
+  margin-top: 4px;
+  font-size: 0.85rem;
+  color: var(--text-muted);
+}
+
+.errorlist {
+  list-style: none;
+  margin: 6px 0 0;
+  padding: 0;
+  color: var(--danger);
+  font-size: 0.9rem;
+  font-weight: 600;
+}
+
+.form > .errorlist { margin: 0 0 16px; }
+
+.btn-block { display: block; width: 100%; text-align: center; }
+
+.form-alt { margin-top: 20px; text-align: center; }
+
 /* Bildirimler */
 .messages { list-style: none; margin: 0 0 16px; padding: 0; }
 

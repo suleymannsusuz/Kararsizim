@@ -7,7 +7,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 The full spec (data model, URLs, vote/response behaviour, design tokens, phase scopes and acceptance criteria, decision log) lives in `docs/kararsizim-proje-plani.md`. Read the relevant sections there before working on a phase; do not duplicate it here.
 
 ## Working agreement
-- Work proceeds in phases (Faz 0–4 in the plan). Implement **only the requested phase**, check its acceptance criteria, run tests, summarize, and stop. Faz 0 is done; Faz 1 (accounts) is next.
+- Work proceeds in phases (Faz 0–4 in the plan). Implement **only the requested phase**, check its acceptance criteria, run tests, summarize, and stop. Faz 0 and Faz 1 (accounts) are done; Faz 2 (poll core) is next.
 - Present a short plan before Faz 2 and Faz 4. Commit only when the user asks.
 - Faz 4: do not use the Supabase/Vercel MCP tools. Prepare code, settings and README, and give the user panel steps to perform themselves.
 - Environment: Python 3.13 in `.venv` (the plan says 3.12; the user chose to keep 3.13), Django 5.2 LTS. Question every new dependency.
@@ -25,6 +25,7 @@ No linter or formatter is configured. The local `.env` is gitignored (copy `.env
 
 ## Architecture notes that span files
 - **Custom user model** (`accounts.User`, `AUTH_USER_MODEL`) logs in by **email** (`USERNAME_FIELD = "email"`). `UserManager` and `User.save()` both lowercase email and username, and case-insensitive `UniqueConstraint(Lower(...))` backs it at the DB level. `first_name`/`last_name` are removed, so the admin in `accounts/admin.py` defines its own fieldsets; keep them in sync with the model. Never change the user model after migrations are applied elsewhere.
+- **Auth flow** (`accounts/`): `RegisterForm` is a plain `forms.Form` (not a ModelForm) so duplicate checks are explicit `__iexact` queries with Turkish messages, and it validates username (`^[a-z0-9_.]{3,20}$` after lowercasing, plus the reserved-names set) and passwords. `LoginForm` takes an email in the `username` field and lowercases it, because lookup is an exact match against the stored lowercase email. Logout is Django's POST-only `LogoutView`. Shared form markup is `templates/partials/form_fields.html`.
 - **Settings** (`config/settings.py`) read everything from env vars. `DATABASE_URL` empty/unset falls back to SQLite (`dj_database_url.parse` with an explicit `or`, because `dj_database_url.config` does not fall back when the variable is set but empty). Postgres-specific tuning (`DISABLE_SERVER_SIDE_CURSORS`, SSL, secure cookies, whitenoise) is intentionally deferred to Faz 4.
 - **Supabase is only a Postgres host.** No Supabase Auth, anon key or JS client; all data access goes through Django. Migrations run locally against the remote DB, never in the Vercel build.
 - **Voting identity** (planned in `polls/voting.py`): `voter_key` is `u:<user id>` for members and `a:<uuid>` from a signed `kz_voter` cookie for guests; `UniqueConstraint(poll, voter_key)` plus `IntegrityError` handling enforces one vote. Results are hidden from non-owners until they vote, and votes cannot be changed.

@@ -1,0 +1,16 @@
+{% extends "base.html" %}
+
+{% block title %}Kayıt ol · kararsızım{% endblock %}
+
+{% block content %}
+  <section class="card card-narrow">
+    <h1 class="card-title">Kayıt ol</h1>
+    <p class="muted">Anket oluşturmak için üye ol. Oy vermek için üyelik gerekmez.</p>
+    <form method="post" class="form" novalidate>
+      {% csrf_token %}
+      {% include "partials/form_fields.html" %}
+      <button type="submit" class="btn btn-primary btn-block">Kayıt ol</button>
+    </form>
+    <p class="form-alt muted">Zaten üye misin? <a href="{% url 'login' %}">Giriş yap</a></p>
+  </section>
+{% endblock %}

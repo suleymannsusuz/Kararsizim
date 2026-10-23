@@ -1,0 +1,16 @@
+{% extends "base.html" %}
+
+{% block title %}Giriş yap · kararsızım{% endblock %}
+
+{% block content %}
+  <section class="card card-narrow">
+    <h1 class="card-title">Giriş yap</h1>
+    <form method="post" class="form" novalidate>
+      {% csrf_token %}
+      <input type="hidden" name="next" value="{{ next }}">
+      {% include "partials/form_fields.html" %}
+      <button type="submit" class="btn btn-primary btn-block">Giriş yap</button>
+    </form>
+    <p class="form-alt muted">Henüz üye değil misin? <a href="{% url 'register' %}">Kayıt ol</a></p>
+  </section>
+{% endblock %}
