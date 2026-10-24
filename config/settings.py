@@ -1,6 +1,7 @@
 """Django settings for kararsızım. Values come from environment variables (.env locally)."""
 
 import os
+import sys
 from pathlib import Path
 
 import dj_database_url
@@ -15,7 +16,11 @@ def env_list(name, default=""):
     return [item.strip() for item in os.environ.get(name, default).split(",") if item.strip()]
 
 
-DEBUG = os.environ.get("DJANGO_DEBUG", "False").lower() in ("1", "true", "yes")
+def env_bool(name, default=False):
+    return os.environ.get(name, str(default)).lower() in ("1", "true", "yes")
+
+
+DEBUG = env_bool("DJANGO_DEBUG")
 
 SECRET_KEY = os.environ.get("DJANGO_SECRET_KEY", "")
 if not SECRET_KEY:
@@ -67,11 +72,20 @@ TEMPLATES = [
 
 WSGI_APPLICATION = "config.wsgi.application"
 
-# DATABASE_URL boşsa yerelde SQLite kullanılır.
+# DATABASE_URL boşsa yerelde SQLite kullanılır. Testler uzak veritabanına asla bağlanmaz
+# (Supabase havuzu test veritabanı oluşturmaya izin vermez, canlı veriye de dokunulmamalı).
+RUNNING_TESTS = len(sys.argv) > 1 and sys.argv[1] == "test"
+DATABASE_URL = "" if RUNNING_TESTS else os.environ.get("DATABASE_URL", "")
+USING_POSTGRES = DATABASE_URL.startswith(("postgres://", "postgresql://"))
+
+# Supabase transaction pooler (6543): bağlantılar havuzda tutulmaz ve sunucu taraflı
+# imleçler kapatılır; Supabase SSL gerektirir (yerel Postgres için DATABASE_SSL_REQUIRE=False).
 DATABASES = {
     "default": dj_database_url.parse(
-        os.environ.get("DATABASE_URL") or f"sqlite:///{BASE_DIR / 'db.sqlite3'}",
+        DATABASE_URL or f"sqlite:///{BASE_DIR / 'db.sqlite3'}",
         conn_max_age=0,
+        disable_server_side_cursors=USING_POSTGRES,
+        ssl_require=USING_POSTGRES and env_bool("DATABASE_SSL_REQUIRE", True),
     )
 }
 
