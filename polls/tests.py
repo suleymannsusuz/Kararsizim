@@ -3,9 +3,9 @@ import uuid
 
 from django.contrib.auth import get_user_model
 from django.db import connection
-from django.test import TestCase
+from django.test import TestCase, override_settings
 from django.test.utils import CaptureQueriesContext
-from django.urls import reverse
+from django.urls import path, reverse
 
 from .models import Option, Poll, Vote
 from .voting import COOKIE_NAME
@@ -904,3 +904,62 @@ class ClosedTabTests(TestCase):
     def test_user_page_shows_closed_polls_with_tag(self):
         response = self.client.get(reverse("user_polls", args=["yazar"]))
         self.assertContains(response, 'class="tag-closed"', count=2)
+
+
+def boom(request):
+    raise RuntimeError("test amaçlı hata")
+
+
+urlpatterns = [path("boom/", boom)]
+
+
+class ErrorPageTests(TestCase):
+    def test_unknown_path_shows_branded_turkish_404(self):
+        for url in ("/abc", "/abc/", "/anket/abc/", "/anket/99999/", "/u/yok_biri/"):
+            with self.subTest(url=url):
+                response = self.client.get(url)
+                self.assertEqual(response.status_code, 404)
+                self.assertContains(response, "Bu sayfa bulunamadı", status_code=404)
+                self.assertContains(response, "Ana sayfaya dön", status_code=404)
+                self.assertContains(response, 'class="logo"', status_code=404)
+                self.assertNotContains(response, "Not Found", status_code=404)
+
+    def test_404_keeps_navbar_for_members(self):
+        make_user("uye")
+        self.client.force_login(User.objects.get(username="uye"))
+        response = self.client.get("/yok-boyle-sayfa/")
+        self.assertEqual(response.status_code, 404)
+        self.assertContains(response, "@uye", status_code=404)
+        self.assertContains(response, "Çıkış", status_code=404)
+
+    def test_404_never_echoes_the_requested_path_or_email(self):
+        make_user("uye", "uye.gizli@example.com")
+        self.client.force_login(User.objects.get(username="uye"))
+        response = self.client.get("/<script>alert(1)</script>/")
+        self.assertEqual(response.status_code, 404)
+        html = response.content.decode()
+        self.assertNotIn("<script>alert(1)</script>", html)
+        self.assertNotIn("uye.gizli@example.com", html)
+
+    def test_forbidden_actions_show_branded_403(self):
+        author = make_user()
+        poll = make_poll(author)
+        self.client.force_login(make_user("baskasi"))
+        for name in ("poll_delete", "poll_close"):
+            with self.subTest(name=name):
+                response = self.client.post(reverse(name, args=[poll.pk]))
+                self.assertEqual(response.status_code, 403)
+                self.assertContains(response, "Buna iznin yok", status_code=403)
+                self.assertContains(response, "Ana sayfaya dön", status_code=403)
+
+    @override_settings(ROOT_URLCONF=__name__)
+    def test_server_error_shows_standalone_turkish_500(self):
+        self.client.raise_request_exception = False
+        response = self.client.get("/boom/")
+        self.assertEqual(response.status_code, 500)
+        html = response.content.decode()
+        self.assertIn("Bir şeyler ters gitti", html)
+        self.assertIn("Ana sayfaya dön", html)
+        self.assertIn("/static/css/main.css", html)
+        self.assertNotIn("RuntimeError", html)
+        self.assertNotIn("test amaçlı hata", html)

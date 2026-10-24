@@ -1,0 +1,7 @@
+{% extends "base.html" %}
+
+{% block title %}İzin yok · kararsızım{% endblock %}
+
+{% block content %}
+  {% include "partials/error_card.html" with code="403" title="Buna iznin yok" text="Bu işlemi yapmak için yetkin yok. Örneğin bir anketi yalnızca sahibi silebilir ya da kapatabilir." %}
+{% endblock %}

@@ -1,0 +1,37 @@
+{% load static %}<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Bir sorun oluştu · kararsızım</title>
+  <link rel="icon" href="{% static 'img/favicon.svg' %}" type="image/svg+xml">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;800&display=swap">
+  <link rel="stylesheet" href="{% static 'css/main.css' %}">
+</head>
+<body>
+  <div class="bg-blobs" aria-hidden="true">
+    <span class="blob blob-1"></span>
+    <span class="blob blob-2"></span>
+    <span class="blob blob-3"></span>
+  </div>
+
+  <header class="navbar">
+    <div class="navbar-inner">
+      <a href="/" class="logo">kararsızım<span class="logo-q">?</span></a>
+    </div>
+  </header>
+
+  <main class="container">
+    <section class="card error-card">
+      <p class="error-code" aria-hidden="true">500</p>
+      <h1 class="error-title">Bir şeyler ters gitti</h1>
+      <p class="muted error-text">Sunucuda beklenmedik bir sorun oluştu. Bu bizim hatamız. Biraz sonra tekrar dene.</p>
+      <div class="error-actions">
+        <a href="/" class="btn btn-primary">Ana sayfaya dön</a>
+      </div>
+    </section>
+  </main>
+</body>
+</html>

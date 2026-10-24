@@ -495,6 +495,29 @@ fieldset.option-fields {
 
 .char-count.is-near-limit { color: var(--danger); font-weight: 600; }
 
+/* Hata sayfaları (403, 404, 500) */
+.error-card {
+  max-width: 520px;
+  margin: 40px auto 0;
+  padding: 40px 28px;
+  text-align: center;
+}
+
+.error-code {
+  margin: 0 0 8px;
+  font-size: clamp(4rem, 18vw, 6.5rem);
+  font-weight: 800;
+  line-height: 1;
+  background: var(--gradient);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+.error-title { margin-bottom: 8px; font-size: 1.5rem; font-weight: 800; }
+.error-text { margin: 0 auto; max-width: 38ch; }
+.error-actions { margin-top: 24px; }
+
 .empty-state { text-align: center; }
 .empty-state .btn { margin-top: 16px; }
 
