@@ -17,6 +17,7 @@ class VoteResult(Enum):
     OK = "ok"
     DUPLICATE = "duplicate"
     INVALID = "invalid"
+    CLOSED = "closed"
 
 
 @dataclass(frozen=True)
@@ -65,7 +66,9 @@ def set_voter_cookie(response, cookie_id):
 
 
 def cast_vote(poll, option_id, voter):
-    """Oyu kaydeder. Seçenek bu ankete ait olmalı; aynı seçmen ikinci kez oy veremez."""
+    """Oyu kaydeder. Seçenek bu ankete ait olmalı; aynı seçmen ikinci kez oy veremez; kapalı ankete oy verilmez."""
+    if poll.is_closed:
+        return VoteResult.CLOSED
     try:
         option = poll.options.get(pk=int(option_id))
     except (TypeError, ValueError, Option.DoesNotExist):
@@ -97,7 +100,10 @@ def attach_results(polls, voter_key, viewer):
         poll.voted_option_id = voted.get(poll.pk)
         poll.has_voted = poll.pk in voted
         poll.is_owner = viewer.is_authenticated and poll.author_id == viewer.pk
-        poll.show_results = poll.has_voted or poll.is_owner
+        # Kapanmış ankete artık oy verilemez, sonuçların kararı etkilemesi söz konusu olmaz: herkese açık.
+        poll.show_results = poll.has_voted or poll.is_owner or poll.is_closed
+        # Sahip sonuçları görürken de oy verebilir; oy butonları sonuç görünürlüğünden bağımsızdır.
+        poll.can_vote = not poll.has_voted and not poll.is_closed
         poll.results = [
             {
                 "option": option,
@@ -107,4 +113,34 @@ def attach_results(polls, voter_key, viewer):
             }
             for option in options
         ]
+        poll.status_label = status_label(
+            [item["votes"] for item in poll.results], poll.show_results, poll.is_owner, poll.is_closed
+        )
     return polls
+
+
+def status_label(counts, show_results, is_owner=False, is_closed=False):
+    """Kartta gösterilen kısa durum etiketi.
+
+    Oy dağılımını ima eden etiketler yalnızca sonuçları görebilen seçmene verilir;
+    diğerleri oy verilmemişse yalnızca "ilk oyu sen ver" cümlesini görür.
+    """
+    total = sum(counts)
+    if total == 0:
+        if is_closed:
+            return "Oy gelmeden kapandı"
+        return "Henüz oy yok" if is_owner else "İlk oyu sen ver"
+    if not show_results:
+        return ""
+    shares = sorted((count * 100 / total for count in counts), reverse=True)
+    top = shares[0]
+    second = shares[1] if len(shares) > 1 else 0
+    if top >= 60:
+        return "Karar net"
+    if top < 45 and sum(1 for share in shares if share >= 15) >= 3:
+        return "Kalabalık da kararsız"
+    if top == second:
+        return "Kafa kafaya"
+    if top - second <= 20:
+        return "Az farkla önde"
+    return "Karar net"

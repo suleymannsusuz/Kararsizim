@@ -1,19 +1,31 @@
 {% extends "base.html" %}
 
+{% block body_class %}is-wide{% endblock %}
+
 {% block content %}
   <nav class="tabs" aria-label="Sıralama">
     <a href="{% url 'home' %}" class="tab{% if not sort %} is-active{% endif %}"{% if not sort %} aria-current="page"{% endif %}>Yeni</a>
-    <a href="{% url 'home' %}?sirala=populer" class="tab{% if sort %} is-active{% endif %}"{% if sort %} aria-current="page"{% endif %}>Popüler</a>
+    <a href="{% url 'home' %}?sirala=populer" class="tab{% if sort == 'populer' %} is-active{% endif %}"{% if sort == 'populer' %} aria-current="page"{% endif %}>Popüler</a>
+    <a href="{% url 'home' %}?sirala=kapananlar" class="tab{% if sort == 'kapananlar' %} is-active{% endif %}"{% if sort == 'kapananlar' %} aria-current="page"{% endif %}>Kapananlar</a>
   </nav>
 
-  {% for poll in page.object_list %}
-    {% include "partials/poll_card.html" %}
-  {% empty %}
+  {% if page.object_list %}
+    <div class="poll-grid">
+      {% for poll in page.object_list %}
+        {% include "partials/poll_card.html" %}
+      {% endfor %}
+    </div>
+  {% elif sort == 'kapananlar' %}
+    <section class="card empty-state">
+      <h1 class="card-title">Kapanan anket yok</h1>
+      <p class="muted">Anket sahipleri anketlerini kapattığında burada görünür.</p>
+    </section>
+  {% else %}
     <section class="card empty-state">
       <h1 class="card-title">Henüz anket yok</h1>
       <p class="muted">Kararsız kaldığın bir şey varsa, ilk soruyu sen sor.</p>
       <a href="{% url 'poll_create' %}" class="btn btn-primary">İlk anketi sen oluştur</a>
     </section>
-  {% endfor %}
+  {% endif %}
   {% include "partials/pagination.html" %}
 {% endblock %}

@@ -1,31 +1,36 @@
 {% load humanize poll_extras %}
-<article class="card poll-card">
+<article class="card poll-card{% if poll.is_closed %} is-closed{% endif %}">
   <header class="poll-meta">
     <span class="avatar" style="background: {{ poll.author.username|avatar_color }}" aria-hidden="true">{{ poll.author.username|slice:":1"|upper }}</span>
     <a href="{% url 'user_polls' poll.author.username %}" class="poll-author">@{{ poll.author.username }}</a>
     <span class="muted">· {{ poll.created_at|naturaltime }}</span>
+    {% if poll.is_closed %}<span class="tag-closed">Kapalı</span>{% endif %}
   </header>
 
   <h2 class="poll-question">{{ poll.question }}</h2>
 
+  <div class="dist" aria-hidden="true">{% if poll.show_results and poll.total_votes %}<div class="dist-fill">{% for result in poll.results %}{% if result.votes %}<span class="seg opt-{{ result.option.position }}" style="flex-grow: {{ result.votes }}"></span>{% endif %}{% endfor %}</div>{% endif %}</div>
+  <p class="poll-verdict">{% if poll.status_label %}{{ poll.status_label }}{% endif %}</p>
+
   {% if poll.show_results %}
-    <ul class="results">
+    <ul class="legend">
       {% for result in poll.results %}
-        <li class="result opt-{{ result.option.position }}">
-          <div class="result-head">
-            <span class="result-text">
-              {{ result.option.text }}
-              {% if result.is_mine %}<span class="mine" title="Senin oyun">✓ <span class="sr-only">Senin oyun</span></span>{% endif %}
-            </span>
-            <span class="result-percent">%{{ result.percent }} <span class="muted">({{ result.votes }})</span></span>
-          </div>
-          <div class="bar"><span class="bar-fill" style="width: {{ result.percent }}%"></span></div>
+        <li class="legend-item opt-{{ result.option.position }}">
+          <span class="dot" aria-hidden="true"></span>
+          <span class="legend-text">
+            {{ result.option.text }}
+            {% if result.is_mine %}<span class="mine" title="Senin oyun">✓ <span class="sr-only">Senin oyun</span></span>{% endif %}
+          </span>
+          <span class="legend-percent">%{{ result.percent }} <span class="muted">({{ result.votes }})</span></span>
         </li>
       {% endfor %}
     </ul>
-  {% else %}
+  {% endif %}
+
+  {% if poll.can_vote %}
     <form method="post" action="{% url 'poll_vote' poll.pk %}" class="vote-form">
       {% csrf_token %}
+      {% if poll.show_results %}<p class="vote-hint">Sen de oy ver</p>{% endif %}
       {% for result in poll.results %}
         <button type="submit" name="option" value="{{ result.option.pk }}" class="option-btn opt-{{ result.option.position }}">
           {{ result.option.text }}
@@ -37,13 +42,21 @@
   <p class="poll-status" role="status"></p>
 
   <footer class="poll-footer">
-    <span class="muted js-total">{{ poll.total_votes }} oy</span>
+    <span class="muted js-total">{{ poll.total_votes }} kişi oy verdi</span>
     {% if detail %}
       {% if poll.is_owner %}
-        <form method="post" action="{% url 'poll_delete' poll.pk %}" class="inline-form" data-confirm="Bu anketi silmek istediğine emin misin? Bu işlem geri alınamaz.">
-          {% csrf_token %}
-          <button type="submit" class="btn btn-ghost btn-sm btn-danger-text">Anketi sil</button>
-        </form>
+        <div class="owner-actions">
+          {% if not poll.is_closed %}
+            <form method="post" action="{% url 'poll_close' poll.pk %}" class="inline-form" data-confirm="Anketi kapatmak istediğine emin misin? Kapatınca oy verilemez ve sonuçlar herkese açık olur.">
+              {% csrf_token %}
+              <button type="submit" class="btn btn-ghost btn-sm">Anketi kapat</button>
+            </form>
+          {% endif %}
+          <form method="post" action="{% url 'poll_delete' poll.pk %}" class="inline-form" data-confirm="Bu anketi silmek istediğine emin misin? Bu işlem geri alınamaz.">
+            {% csrf_token %}
+            <button type="submit" class="btn btn-ghost btn-sm btn-danger-text">Anketi sil</button>
+          </form>
+        </div>
       {% endif %}
     {% else %}
       <a href="{% url 'poll_detail' poll.pk %}" class="poll-link">Detay →</a>

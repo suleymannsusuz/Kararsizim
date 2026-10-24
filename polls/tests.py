@@ -208,33 +208,74 @@ class ResultsVisibilityTests(TestCase):
     def test_results_hidden_before_voting(self):
         for url in (reverse("poll_detail", args=[self.poll.pk]), reverse("home")):
             response = self.client.get(url)
-            self.assertNotContains(response, 'class="bar"')
+            self.assertNotContains(response, 'class="seg')
+            self.assertNotContains(response, 'class="legend')
             self.assertNotContains(response, "%67")
+            for label in ("Karar net", "Az farkla önde", "Kalabalık da kararsız", "Kafa kafaya"):
+                self.assertNotContains(response, label)
             self.assertContains(response, 'class="option-btn')
-            self.assertContains(response, "3 oy")
+            self.assertContains(response, "3 kişi oy verdi")
 
     def test_results_shown_after_voting_with_own_choice_marked(self):
         self.client.post(reverse("poll_vote", args=[self.poll.pk]), {"option": self.restoran.pk})
         response = self.detail()
-        self.assertContains(response, 'class="bar"', count=2)
+        self.assertContains(response, 'class="seg opt-', count=2)
+        self.assertContains(response, 'class="legend-item', count=2)
         self.assertNotContains(response, 'class="option-btn')
-        self.assertContains(response, "4 oy")
+        self.assertContains(response, "4 kişi oy verdi")
+        self.assertContains(response, "Kafa kafaya")
         results = response.context["poll"].results
         self.assertEqual([r["votes"] for r in results], [2, 2])
         self.assertEqual([r["percent"] for r in results], [50, 50])
         self.assertEqual([r["is_mine"] for r in results], [False, True])
         self.assertContains(response, "✓")
 
-    def test_owner_always_sees_results(self):
+    def test_owner_sees_results_and_vote_buttons_until_voting(self):
         self.client.force_login(self.author)
         for url in (reverse("poll_detail", args=[self.poll.pk]), reverse("home")):
             response = self.client.get(url)
-            self.assertContains(response, 'class="bar"', count=2)
-            self.assertNotContains(response, 'class="option-btn')
+            self.assertContains(response, 'class="seg opt-', count=2)
+            self.assertContains(response, 'class="legend-item', count=2)
+            self.assertContains(response, 'class="option-btn', count=2)
+            self.assertContains(response, "Sen de oy ver")
+
+    def test_owner_vote_is_recorded_and_buttons_disappear(self):
+        self.client.force_login(self.author)
+        response = self.client.post(reverse("poll_vote", args=[self.poll.pk]), {"option": self.sinema.pk})
+        self.assertRedirects(response, reverse("poll_detail", args=[self.poll.pk]))
+        vote = Vote.objects.get(user=self.author)
+        self.assertEqual((vote.option, vote.voter_key), (self.sinema, f"u:{self.author.pk}"))
+        detail = self.detail()
+        self.assertNotContains(detail, 'class="option-btn')
+        self.assertNotContains(detail, "Sen de oy ver")
+        self.assertContains(detail, "✓")
+        self.assertEqual([r["is_mine"] for r in detail.context["poll"].results], [True, False])
+        self.assertEqual(detail.context["poll"].total_votes, 4)
+
+    def test_owner_cannot_vote_twice(self):
+        self.client.force_login(self.author)
+        url = reverse("poll_vote", args=[self.poll.pk])
+        self.client.post(url, {"option": self.sinema.pk})
+        self.client.post(url, {"option": self.restoran.pk})
+        self.assertEqual(Vote.objects.filter(user=self.author).count(), 1)
+
+    def test_owner_cannot_vote_on_closed_poll_and_sees_no_buttons(self):
+        close_poll(self.poll)
+        self.client.force_login(self.author)
+        self.assertNotContains(self.detail(), 'class="option-btn')
+        self.client.post(reverse("poll_vote", args=[self.poll.pk]), {"option": self.sinema.pk})
+        self.assertFalse(Vote.objects.filter(user=self.author).exists())
+
+    def test_vote_hint_is_only_shown_when_results_are_also_visible(self):
+        response = self.detail()
+        self.assertContains(response, 'class="option-btn')
+        self.assertNotContains(response, "Sen de oy ver")
 
     def test_other_members_do_not_see_results_before_voting(self):
         self.client.force_login(make_user("baskasi"))
-        self.assertNotContains(self.detail(), 'class="bar"')
+        response = self.detail()
+        self.assertNotContains(response, 'class="seg')
+        self.assertNotContains(response, 'class="legend')
 
 
 class FeedTests(TestCase):
@@ -369,6 +410,7 @@ class JsonVoteTests(TestCase):
             [(self.sinema.pk, "Sinema", 1, 50), (self.restoran.pk, "Restoran", 1, 50), (self.evde.pk, "Evde kal", 0, 0)],
         )
         self.assertEqual([r["position"] for r in data["results"]], [0, 1, 2])
+        self.assertEqual(data["status_label"], "Kafa kafaya")
         self.assertEqual(Vote.objects.count(), 2)
 
     def test_guest_json_vote_sets_cookie_and_second_vote_is_409_with_results(self):
@@ -515,7 +557,7 @@ class UserPollsPageTests(TestCase):
     def test_voting_state_is_respected_on_user_page(self):
         self.client.post(reverse("poll_vote", args=[self.ali_poll.pk]), {"option": self.ali_poll.options.first().pk})
         response = self.client.get("/u/ali.veli/")
-        self.assertContains(response, 'class="bar"', count=2)
+        self.assertContains(response, 'class="legend-item', count=2)
 
     def test_deleted_polls_disappear_from_user_page(self):
         self.client.force_login(self.ali)
@@ -557,5 +599,308 @@ class UiDetailTests(TestCase):
         self.assertContains(response, 'role="status"')
         self.assertContains(response, "js-total")
 
+    def test_css_and_js_urls_carry_a_version_to_defeat_stale_browser_cache(self):
+        html = self.client.get(reverse("home")).content.decode()
+        self.assertRegex(html, r'/static/css/main\.css\?v=\d+')
+        self.assertRegex(html, r'/static/js/main\.js\?v=\d+')
+
     def test_favicon_is_linked(self):
         self.assertContains(self.client.get(reverse("home")), "img/favicon.svg")
+
+
+class StatusLabelTests(TestCase):
+    def label(self, counts, show_results=True, is_owner=False):
+        from .voting import status_label
+
+        return status_label(counts, show_results, is_owner)
+
+    def test_no_votes(self):
+        self.assertEqual(self.label([0, 0]), "İlk oyu sen ver")
+        self.assertEqual(self.label([0, 0, 0], is_owner=True), "Henüz oy yok")
+        self.assertEqual(self.label([0, 0], show_results=False), "İlk oyu sen ver")
+
+    def test_hidden_results_get_no_distribution_hint(self):
+        self.assertEqual(self.label([9, 1], show_results=False), "")
+
+    def test_decisive_poll(self):
+        self.assertEqual(self.label([13, 7]), "Karar net")  # %65
+        self.assertEqual(self.label([8, 1, 1]), "Karar net")
+        self.assertEqual(self.label([60, 40]), "Karar net")  # eşik: %60
+
+    def test_narrow_lead(self):
+        self.assertEqual(self.label([11, 9]), "Az farkla önde")  # %55 - %45
+        self.assertEqual(self.label([50, 30, 20]), "Az farkla önde")
+
+    def test_exact_tie(self):
+        self.assertEqual(self.label([5, 5]), "Kafa kafaya")
+
+    def test_crowd_split_across_many_options(self):
+        self.assertEqual(self.label([4, 4, 3, 3]), "Kalabalık da kararsız")
+        self.assertEqual(self.label([5, 4, 4, 1, 1]), "Kalabalık da kararsız")
+
+    def test_leader_more_than_twenty_points_ahead_is_decisive(self):
+        self.assertEqual(self.label([55, 30, 15]), "Karar net")
+        self.assertEqual(self.label([58, 20, 22]), "Karar net")
+
+
+class CardDesignTests(TestCase):
+    def setUp(self):
+        self.author = make_user()
+
+    def test_feed_and_user_page_use_wide_two_column_layout(self):
+        make_poll(self.author)
+        for url in (reverse("home"), reverse("user_polls", args=["yazar"])):
+            response = self.client.get(url)
+            self.assertContains(response, '<body class="is-wide">')
+            self.assertContains(response, 'class="poll-grid"')
+
+    def test_detail_create_and_auth_pages_stay_narrow(self):
+        poll = make_poll(self.author)
+        self.client.force_login(self.author)
+        for url in (reverse("poll_detail", args=[poll.pk]), reverse("poll_create")):
+            self.assertNotContains(self.client.get(url), "is-wide")
+        self.client.logout()
+        for url in (reverse("login"), reverse("register")):
+            self.assertNotContains(self.client.get(url), "is-wide")
+
+    def test_empty_feed_does_not_render_grid(self):
+        response = self.client.get(reverse("home"))
+        self.assertNotContains(response, 'class="poll-grid"')
+        self.assertContains(response, "Henüz anket yok")
+
+    def test_unvoted_poll_with_votes_shows_neutral_bar_and_no_verdict(self):
+        poll = make_poll(self.author)
+        for index in range(4):
+            Vote.objects.create(poll=poll, option=poll.options.first(), voter_key=f"a:{index}")
+        response = self.client.get(reverse("home"))
+        self.assertContains(response, 'class="dist"')
+        self.assertNotContains(response, "dist-fill")
+        self.assertContains(response, '<p class="poll-verdict"></p>', html=False)
+        self.assertContains(response, "4 kişi oy verdi")
+
+    def test_poll_without_votes_invites_first_vote(self):
+        make_poll(self.author)
+        response = self.client.get(reverse("home"))
+        self.assertContains(response, "İlk oyu sen ver")
+        self.assertContains(response, "0 kişi oy verdi")
+        self.assertNotContains(response, "dist-fill")
+
+    def test_owner_sees_waiting_label_when_no_votes(self):
+        make_poll(self.author)
+        self.client.force_login(self.author)
+        self.assertContains(self.client.get(reverse("home")), "Henüz oy yok")
+
+    def test_segments_are_proportional_and_skip_empty_options(self):
+        poll = make_poll(self.author, options=("A", "B", "C"))
+        a, b, c = poll.options.all()
+        for index, option in enumerate([a, a, a, c]):
+            Vote.objects.create(poll=poll, option=option, voter_key=f"a:s{index}")
+        self.client.force_login(self.author)
+        html = self.client.get(reverse("poll_detail", args=[poll.pk])).content.decode()
+        segments = re.findall(r'class="seg (opt-\d)" style="flex-grow: (\d+)"', html)
+        self.assertEqual(segments, [("opt-0", "3"), ("opt-2", "1")])
+        self.assertIn("Karar net", html)
+
+    def test_voter_sees_verdict_in_feed_after_voting(self):
+        poll = make_poll(self.author)
+        for index in range(3):
+            Vote.objects.create(poll=poll, option=poll.options.last(), voter_key=f"a:o{index}")
+        self.client.post(reverse("poll_vote", args=[poll.pk]), {"option": poll.options.last().pk})
+        response = self.client.get(reverse("home"))
+        self.assertContains(response, "Karar net")
+        self.assertContains(response, "4 kişi oy verdi")
+
+    def test_legend_never_shows_counts_to_unvoted_visitors(self):
+        poll = make_poll(self.author)
+        for index in range(5):
+            Vote.objects.create(poll=poll, option=poll.options.first(), voter_key=f"a:x{index}")
+        for url in (reverse("home"), reverse("poll_detail", args=[poll.pk]), reverse("user_polls", args=["yazar"])):
+            response = self.client.get(url)
+            self.assertNotContains(response, "%100")
+            self.assertNotContains(response, "legend-item")
+
+
+def close_poll(poll, minutes_ago=0):
+    from datetime import timedelta
+
+    from django.utils import timezone
+
+    Poll.objects.filter(pk=poll.pk).update(closed_at=timezone.now() - timedelta(minutes=minutes_ago))
+    poll.refresh_from_db()
+    return poll
+
+
+class ClosePollTests(TestCase):
+    def setUp(self):
+        self.author = make_user()
+        self.poll = make_poll(self.author)
+        self.url = reverse("poll_close", args=[self.poll.pk])
+
+    def test_owner_can_close_and_is_redirected_to_detail(self):
+        self.client.force_login(self.author)
+        response = self.client.post(self.url)
+        self.assertRedirects(response, reverse("poll_detail", args=[self.poll.pk]))
+        self.poll.refresh_from_db()
+        self.assertTrue(self.poll.is_closed)
+        self.assertIsNotNone(self.poll.closed_at)
+
+    def test_other_member_gets_403_and_poll_stays_open(self):
+        self.client.force_login(make_user("baskasi"))
+        self.assertEqual(self.client.post(self.url).status_code, 403)
+        self.poll.refresh_from_db()
+        self.assertFalse(self.poll.is_closed)
+
+    def test_guest_is_sent_to_login_and_poll_stays_open(self):
+        response = self.client.post(self.url)
+        self.assertEqual(response.status_code, 302)
+        self.assertIn("/giris/", response["Location"])
+        self.poll.refresh_from_db()
+        self.assertFalse(self.poll.is_closed)
+
+    def test_close_requires_post(self):
+        self.client.force_login(self.author)
+        self.assertEqual(self.client.get(self.url).status_code, 405)
+        self.poll.refresh_from_db()
+        self.assertFalse(self.poll.is_closed)
+
+    def test_closing_twice_keeps_first_closing_time(self):
+        self.client.force_login(self.author)
+        self.client.post(self.url)
+        self.poll.refresh_from_db()
+        first = self.poll.closed_at
+        response = self.client.post(self.url)
+        self.assertEqual(response.status_code, 302)
+        self.poll.refresh_from_db()
+        self.assertEqual(self.poll.closed_at, first)
+
+    def test_close_button_only_for_owner_and_only_while_open(self):
+        detail = reverse("poll_detail", args=[self.poll.pk])
+        self.assertNotContains(self.client.get(detail), "Anketi kapat")
+        self.client.force_login(make_user("baskasi"))
+        self.assertNotContains(self.client.get(detail), "Anketi kapat")
+        self.client.force_login(self.author)
+        self.assertContains(self.client.get(detail), "Anketi kapat")
+        self.assertContains(self.client.get(detail), "data-confirm=")
+        close_poll(self.poll)
+        response = self.client.get(detail)
+        self.assertNotContains(response, "Anketi kapat")
+        self.assertContains(response, "Anketi sil")
+
+    def test_owner_can_still_delete_a_closed_poll(self):
+        close_poll(self.poll)
+        self.client.force_login(self.author)
+        self.client.post(reverse("poll_delete", args=[self.poll.pk]))
+        self.assertEqual(Poll.objects.count(), 0)
+
+
+class ClosedPollBehaviourTests(TestCase):
+    def setUp(self):
+        self.author = make_user()
+        self.poll = make_poll(self.author)
+        self.sinema, self.restoran = self.poll.options.all()
+        for key, option in (("a:1", self.sinema), ("a:2", self.sinema), ("a:3", self.restoran)):
+            Vote.objects.create(poll=self.poll, option=option, voter_key=key)
+        close_poll(self.poll)
+        self.url = reverse("poll_vote", args=[self.poll.pk])
+
+    def test_vote_on_closed_poll_is_not_recorded_and_sets_no_cookie(self):
+        response = self.client.post(self.url, {"option": self.sinema.pk})
+        self.assertRedirects(response, reverse("poll_detail", args=[self.poll.pk]))
+        self.assertEqual(Vote.objects.count(), 3)
+        self.assertNotIn(COOKIE_NAME, self.client.cookies)
+        self.assertIn("Bu anket kapandı.", [str(m) for m in response.wsgi_request._messages])
+
+    def test_json_vote_on_closed_poll_returns_409_with_results(self):
+        response = self.client.post(self.url, {"option": self.sinema.pk}, **JSON)
+        self.assertEqual(response.status_code, 409)
+        data = response.json()
+        self.assertFalse(data["ok"])
+        self.assertTrue(data["closed"])
+        self.assertEqual(data["error"], "Bu anket kapandı.")
+        self.assertEqual(data["total"], 3)
+        self.assertEqual([r["votes"] for r in data["results"]], [2, 1])
+        self.assertIsNone(data["voted_option_id"])
+        self.assertNotIn(COOKIE_NAME, self.client.cookies)
+        self.assertNotIn("@", response.content.decode())
+
+    def test_results_are_public_on_closed_poll_without_voting(self):
+        for url in (reverse("poll_detail", args=[self.poll.pk]), reverse("home")):
+            response = self.client.get(url)
+            self.assertContains(response, 'class="seg opt-', count=2)
+            self.assertContains(response, 'class="legend-item', count=2)
+            self.assertNotContains(response, 'class="option-btn')
+            self.assertContains(response, "Kapalı")
+            self.assertContains(response, "Karar net")
+            self.assertContains(response, "3 kişi oy verdi")
+
+    def test_closed_poll_with_no_votes_says_so(self):
+        empty = close_poll(make_poll(self.author, question="Oy gelmeyen anket burada?"))
+        response = self.client.get(reverse("poll_detail", args=[empty.pk]))
+        self.assertContains(response, "Oy gelmeden kapandı")
+        self.assertContains(response, "0 kişi oy verdi")
+
+    def test_closed_card_has_closed_class(self):
+        self.assertContains(self.client.get(reverse("home")), "poll-card is-closed")
+
+    def test_open_poll_hides_closed_marker(self):
+        make_poll(self.author, question="Açık anket burada?")
+        html = self.client.get(reverse("home")).content.decode()
+        self.assertEqual(html.count('class="tag-closed"'), 1)
+
+
+class ClosedTabTests(TestCase):
+    def setUp(self):
+        author = make_user()
+        self.open_poll = make_poll(author, question="Açık kalan anket burada?")
+        self.old_closed = close_poll(make_poll(author, question="Önce kapanan anket?"), minutes_ago=60)
+        self.new_closed = close_poll(make_poll(author, question="Sonra kapanan anket?"), minutes_ago=5)
+
+    def questions(self, query=""):
+        response = self.client.get(reverse("home") + query)
+        return [poll.question for poll in response.context["page"].object_list]
+
+    def test_closed_tab_lists_only_closed_polls_latest_closing_first(self):
+        self.assertEqual(self.questions("?sirala=kapananlar"), ["Sonra kapanan anket?", "Önce kapanan anket?"])
+
+    def test_new_and_popular_tabs_still_list_closed_polls(self):
+        self.assertEqual(len(self.questions()), 3)
+        self.assertEqual(len(self.questions("?sirala=populer")), 3)
+
+    def test_tabs_mark_closed_as_active(self):
+        response = self.client.get(reverse("home") + "?sirala=kapananlar")
+        self.assertContains(response, 'class="tab is-active" aria-current="page">Kapananlar')
+        self.assertContains(response, 'class="tab">Yeni')
+        self.assertContains(response, 'class="tab">Popüler')
+
+    def test_closed_tab_pagination_keeps_sort(self):
+        author = make_user("baska")
+        for index in range(20):
+            close_poll(make_poll(author, question=f"Kapalı ek anket {index:02d}?"))
+        response = self.client.get(reverse("home") + "?sirala=kapananlar")
+        self.assertContains(response, "?sayfa=2&amp;sirala=kapananlar")
+
+    def test_empty_closed_tab_message(self):
+        Poll.objects.all().update(closed_at=None)
+        response = self.client.get(reverse("home") + "?sirala=kapananlar")
+        self.assertContains(response, "Kapanan anket yok")
+        self.assertNotContains(response, "İlk anketi sen oluştur")
+
+    def test_closed_tab_query_count_is_constant(self):
+        author = make_user("baska")
+
+        def count_queries():
+            with CaptureQueriesContext(connection) as queries:
+                self.assertEqual(self.client.get(reverse("home") + "?sirala=kapananlar").status_code, 200)
+            return len(queries)
+
+        few = count_queries()
+        for index in range(10):
+            close_poll(make_poll(author, question=f"Kapalı ek anket {index:02d}?"))
+        self.assertEqual(count_queries(), few)
+
+    def test_unknown_sort_still_falls_back_to_new(self):
+        self.assertEqual(self.questions("?sirala=bilinmeyen"), self.questions())
+
+    def test_user_page_shows_closed_polls_with_tag(self):
+        response = self.client.get(reverse("user_polls", args=["yazar"]))
+        self.assertContains(response, 'class="tag-closed"', count=2)

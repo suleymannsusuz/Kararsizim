@@ -3,6 +3,8 @@
 
 {% block title %}@{{ profile.username }} · kararsızım{% endblock %}
 
+{% block body_class %}is-wide{% endblock %}
+
 {% block content %}
   <header class="profile-head">
     <span class="avatar avatar-lg" style="background: {{ profile.username|avatar_color }}" aria-hidden="true">{{ profile.username|slice:":1"|upper }}</span>
@@ -12,13 +14,17 @@
     </div>
   </header>
 
-  {% for poll in page.object_list %}
-    {% include "partials/poll_card.html" %}
-  {% empty %}
+  {% if page.object_list %}
+    <div class="poll-grid">
+      {% for poll in page.object_list %}
+        {% include "partials/poll_card.html" %}
+      {% endfor %}
+    </div>
+  {% else %}
     <section class="card empty-state">
       <h2 class="card-title">Henüz anket yok</h2>
       <p class="muted">@{{ profile.username }} henüz bir anket oluşturmamış.</p>
     </section>
-  {% endfor %}
+  {% endif %}
   {% include "partials/pagination.html" %}
 {% endblock %}

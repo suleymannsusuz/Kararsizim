@@ -19,43 +19,66 @@
 
   // --- Oy verme -----------------------------------------------------------
 
-  function buildResults(data) {
-    var list = el("ul", "results");
+  // Parçalı dağılım çubuğu: şablondaki .dist-fill ile aynı yapı.
+  function buildDistFill(data) {
+    var fill = el("div", "dist-fill");
+    data.results.forEach(function (item) {
+      if (!item.votes) return;
+      var segment = el("span", "seg opt-" + item.position);
+      segment.style.flexGrow = String(item.votes);
+      fill.appendChild(segment);
+    });
+    return fill;
+  }
+
+  // Seçenek listesi: şablondaki .legend ile aynı yapı.
+  function buildLegend(data) {
+    var list = el("ul", "legend");
     list.tabIndex = -1;
     data.results.forEach(function (item) {
-      var row = el("li", "result opt-" + item.position);
+      var row = el("li", "legend-item opt-" + item.position);
+      row.appendChild(el("span", "dot"));
 
-      var head = el("div", "result-head");
-      var text = el("span", "result-text", item.text + " ");
+      var text = el("span", "legend-text", item.text + " ");
       if (item.option_id === data.voted_option_id) {
         var mine = el("span", "mine", "✓ ");
         mine.title = "Senin oyun";
         mine.appendChild(el("span", "sr-only", "Senin oyun"));
         text.appendChild(mine);
       }
-      var percent = el("span", "result-percent", "%" + item.percent + " ");
+      var percent = el("span", "legend-percent", "%" + item.percent + " ");
       percent.appendChild(el("span", "muted", "(" + item.votes + ")"));
-      head.appendChild(text);
-      head.appendChild(percent);
 
-      var bar = el("div", "bar");
-      var fill = el("span", "bar-fill");
-      fill.style.width = item.percent + "%";
-      bar.appendChild(fill);
-
-      row.appendChild(head);
-      row.appendChild(bar);
+      row.appendChild(text);
+      row.appendChild(percent);
       list.appendChild(row);
     });
     return list;
   }
 
   function showResults(card, form, data) {
-    var results = buildResults(data);
-    form.replaceWith(results);
+    var dist = card.querySelector(".dist");
+    if (dist && data.total) {
+      dist.textContent = "";
+      dist.appendChild(buildDistFill(data));
+    }
+    var verdict = card.querySelector(".poll-verdict");
+    if (verdict) verdict.textContent = data.status_label || "";
+
+    if (data.closed) card.classList.add("is-closed");
+
+    // Anket sahibinin kartında sonuçlar oy öncesi de görünür: mevcut listeyi güncelle, formu kaldır.
+    var legend = buildLegend(data);
+    var existing = card.querySelector(".legend");
+    if (existing) {
+      existing.replaceWith(legend);
+      form.remove();
+    } else {
+      form.replaceWith(legend);
+    }
     var total = card.querySelector(".js-total");
-    if (total) total.textContent = data.total + " oy";
-    results.focus({ preventScroll: true });
+    if (total) total.textContent = data.total + " kişi oy verdi";
+    legend.focus({ preventScroll: true });
   }
 
   function setBusy(form, busy) {

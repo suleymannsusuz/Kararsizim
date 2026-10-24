@@ -6,6 +6,7 @@ from django.core.paginator import Paginator
 from django.db.models import Count
 from django.http import JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
+from django.utils import timezone
 from django.views.decorators.http import require_POST
 
 from .forms import PollForm
@@ -23,13 +24,17 @@ User = get_user_model()
 
 PAGE_SIZE = 20
 SORT_POPULAR = "populer"
+SORT_CLOSED = "kapananlar"
 
 
 def feed(request):
+    """Yeni (varsayılan), Popüler ve Kapananlar sekmeleri; kapalı anketler Yeni ve Popüler'de de 'Kapalı' etiketiyle görünür."""
     polls = Poll.objects.with_results()
     sort = request.GET.get("sirala")
     if sort == SORT_POPULAR:
         polls = polls.annotate(vote_total=Count("votes")).order_by("-vote_total", "-created_at", "-pk")
+    elif sort == SORT_CLOSED:
+        polls = polls.filter(closed_at__isnull=False).order_by("-closed_at", "-pk")
     else:
         sort = ""
     page = Paginator(polls, PAGE_SIZE).get_page(request.GET.get("sayfa"))
@@ -37,7 +42,7 @@ def feed(request):
     context = {
         "page": page,
         "sort": sort,
-        "extra_qs": f"&sirala={SORT_POPULAR}" if sort else "",
+        "extra_qs": f"&sirala={sort}" if sort else "",
     }
     return render(request, "polls/feed.html", context)
 
@@ -91,9 +96,13 @@ def _vote_json(request, poll, voter, result):
         ],
         "total": poll.total_votes,
         "voted_option_id": poll.voted_option_id,
+        "status_label": poll.status_label,
     }
     if result is VoteResult.DUPLICATE:
         payload["error"] = "Bu ankete zaten oy verdin."
+    elif result is VoteResult.CLOSED:
+        payload["error"] = "Bu anket kapandı."
+        payload["closed"] = True
     response = JsonResponse(payload, status=200 if result is VoteResult.OK else 409)
     if result is VoteResult.OK and voter.new_cookie_id:
         set_voter_cookie(response, voter.new_cookie_id)
@@ -113,6 +122,8 @@ def vote(request, pk):
         messages.success(request, "Oyun kaydedildi.")
     elif result is VoteResult.DUPLICATE:
         messages.info(request, "Bu ankete zaten oy verdin.")
+    elif result is VoteResult.CLOSED:
+        messages.info(request, "Bu anket kapandı.")
     else:
         messages.error(request, "Geçersiz seçenek.")
 
@@ -120,6 +131,21 @@ def vote(request, pk):
     if result is VoteResult.OK and voter.new_cookie_id:
         set_voter_cookie(response, voter.new_cookie_id)
     return response
+
+
+@login_required
+@require_POST
+def close(request, pk):
+    poll = get_object_or_404(Poll, pk=pk)
+    if poll.author_id != request.user.pk:
+        raise PermissionDenied
+    if poll.is_closed:
+        messages.info(request, "Bu anket zaten kapalı.")
+    else:
+        # Aynı anda gelen iki isteğin kapanış zamanını ezmemesi için yalnızca açık anket güncellenir.
+        Poll.objects.filter(pk=poll.pk, closed_at__isnull=True).update(closed_at=timezone.now())
+        messages.success(request, "Anket kapatıldı. Artık oy verilemez, sonuçlar herkese açık.")
+    return redirect(poll)
 
 
 @login_required

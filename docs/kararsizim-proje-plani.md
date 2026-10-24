@@ -184,6 +184,8 @@ Tüm URL'ler ve arayüz metinleri **Türkçe**dir.
 | `/anket/<id>/oy/` | Oy ver (POST) | Herkes | JSON veya yönlendirme döner |
 | `/anket/olustur/` | Anket oluştur | Giriş gerekli | Giriş yoksa `/giris/?next=...` adresine yönlendirir |
 | `/anket/<id>/sil/` | Anket sil (POST) | Yalnızca sahibi | Onay sonrası silme |
+| `/anket/<id>/kapat/` | Anket kapat (POST) | Yalnızca sahibi | Kapatınca oy verilemez, sonuçlar herkese açılır |
+| `/?sirala=kapananlar` | Ana akış | Herkes | Kapanan anketler, en son kapanan üstte |
 | `/u/<kullanici_adi>/` | Kullanıcının anketleri | Herkes | Yalnızca kullanıcı adı ve anketleri (Faz 3) |
 | `/kayit/` | Kayıt | Misafir | E-posta, kullanıcı adı, parola, parola tekrar |
 | `/giris/` | Giriş | Misafir | E-posta + parola |
@@ -443,6 +445,10 @@ Aşağıdakiler bilerek kapsam dışıdır; ileride ayrı fazlar olarak eklenece
 | 10 | Oy vermeden sonuç görünmez, oy değiştirilemez | Çoğunluğa bakarak oy verilmesin |
 | 11 | Anket oluşturulduktan sonra düzenlenemez | Oy verildikten sonra seçenekler değiştirilemesin |
 | 12 | Frontend: saf HTML/CSS/JS, JS'siz de çalışır | Build adımı yok, basit ve sağlam |
+| 13 | Akış ve kullanıcı sayfası: geniş ekranda iki sütun, kompakt kartlar; parçalı renkli dağılım çubuğu ve durum etiketi ("Karar net", "Az farkla önde", "Kalabalık da kararsız", "Kafa kafaya", "İlk oyu sen ver") | Referans tasarıma yakın, kartlar bir bakışta okunur; palet ve yazı tipi bizim |
+| 14 | Dağılım çubuğu ve etiketler oy vermeden görünmez (gri çubuk + "N kişi oy verdi") | Karar #10 korunur |
+| 15 | Anket sahibi anketi elle kapatabilir (`POST /anket/<id>/kapat/`); kapalı ankete oy verilmez, sonuçlar herkese açılır; "Kapalı" etiketi ve "Kapananlar" sekmesi eklendi. Süreli kapanma eklenmedi | Oy kararını etkileme riski kapanışla biter; süreli kapanma Bölüm 9'daki sonraki işler arasında kalır |
+| 16 | Anket sahibi kendi anketine oy verebilir; oy verene kadar sonuçları ve oy butonlarını birlikte görür | Sahibin oyu da sayılır; sahip sonuçları önceden bildiği için oyu çoğunluğa bakılarak verilmiş olabilir, bu bilinçli kabul edildi |
 
 ---
 

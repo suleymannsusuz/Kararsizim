@@ -21,6 +21,7 @@ class Poll(models.Model):
     )
     question = models.CharField("soru", max_length=140, validators=[MinLengthValidator(5)])
     created_at = models.DateTimeField(auto_now_add=True, db_index=True)
+    closed_at = models.DateTimeField("kapanış zamanı", null=True, blank=True, db_index=True)
 
     objects = PollQuerySet.as_manager()
 
@@ -30,6 +31,10 @@ class Poll(models.Model):
     def save(self, *args, **kwargs):
         self.question = " ".join(self.question.split())
         super().save(*args, **kwargs)
+
+    @property
+    def is_closed(self):
+        return self.closed_at is not None
 
     def get_absolute_url(self):
         return reverse("poll_detail", args=[self.pk])
