@@ -82,4 +82,31 @@ Django, tabloların sahibi olan `postgres` rolüyle bağlandığı için RLS uyg
 
 ## Yayın (Vercel)
 
-Sonraki aşamada eklenecek.
+Vercel, projeyi `manage.py` üzerinden Django olarak tanır ve `config.wsgi.application` giriş noktasını `WSGI_APPLICATION` ayarından okur. Ek bir yapılandırma dosyası gerekmez; depodaki iki küçük dosya yeterlidir:
+
+- `.python-version`: Python sürümü (3.13).
+- `vercel.json`: fonksiyon bölgesi `fra1` (Frankfurt, Supabase'e yakın).
+
+### Statik dosyalar
+`STATIC_ROOT` tanımlı olduğu için Vercel, yayın sırasında `collectstatic`'i kendisi çalıştırır ve dosyaları CDN'den sunar. WhiteNoise gerekmez. `staticfiles/` klasörü `.gitignore`'dadır, depoya girmez.
+
+### Kurulum adımları
+1. Vercel panelinde **Add New → Project** ile GitHub deposunu içe aktar (Vercel'e GitHub erişimi vermen gerekir). Framework **Django** olarak algılanır; build ve çıktı ayarlarına dokunma.
+2. **Settings → Environment Variables** bölümünde şunları **Production** (ve istersen Preview) için ekle:
+
+| Değişken | Değer |
+|---|---|
+| `DJANGO_SECRET_KEY` | Yeni ve uzun rastgele bir anahtar (**Sensitive** işaretle). Üretmek için: `python -c "import secrets; print(secrets.token_urlsafe(60))"` |
+| `DJANGO_DEBUG` | `False` |
+| `DATABASE_URL` | Supabase **Transaction pooler** bağlantı dizesi (**Sensitive** işaretle) |
+
+3. Deploy et. Sonraki her `git push` otomatik yayınlanır.
+
+Alan adı için `DJANGO_ALLOWED_HOSTS` / `DJANGO_CSRF_TRUSTED_ORIGINS` gerekmez: Vercel'in `VERCEL_PROJECT_PRODUCTION_URL`, `VERCEL_URL` ve `VERCEL_BRANCH_URL` sistem değişkenleri otomatik kullanılır. Özel alan adı eklersen bu iki değişkene de yaz (virgülle ayrılmış; CSRF için `https://` ile).
+
+Vercel'de `SECURE_SSL_REDIRECT`, güvenli çerezler, HSTS (1 yıl) ve `X-Forwarded-Proto` ayarı otomatik açılır. Başka bir barındırmada `DJANGO_SECURE=True` ile aynısını aç. Yerelde `DEBUG=False` ile denerken bunlar kapalıdır, böylece `http://localhost` çalışır.
+
+### Yayından önce ve sonra
+- Migrasyonlar yayın sırasında **çalışmaz**; yeni bir migrasyon eklediğinde yerelden `migrate` çalıştır (Supabase'e) ve yeni tablo oluşuyorsa RLS adımını tekrarla.
+- Yayın ortamını yerelde taklit etmek için: `VERCEL=1`, `DJANGO_DEBUG=False`, uzun bir `DJANGO_SECRET_KEY` ve `VERCEL_PROJECT_PRODUCTION_URL` ile `python manage.py check --deploy` çalıştır. Kalan iki uyarı (HSTS alt alan adları ve preload) `vercel.app` ortak alan adı olduğu için bilerek açık bırakılmıştır.
+- 500 sayfası bağımsız bir şablondur ve CSS'ini `/static/` yolundan alır; statik dosya sunumu çalışmazsa stilsiz görünür.

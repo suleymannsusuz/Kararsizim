@@ -17,7 +17,11 @@ def env_list(name, default=""):
 
 
 def env_bool(name, default=False):
-    return os.environ.get(name, str(default)).lower() in ("1", "true", "yes")
+    """Tanımsız ya da boş değişken varsayılana düşer (panelden boş bırakılan değer bir şeyi kapatmasın)."""
+    value = os.environ.get(name, "").strip()
+    if not value:
+        return default
+    return value.lower() in ("1", "true", "yes")
 
 
 DEBUG = env_bool("DJANGO_DEBUG")
@@ -30,6 +34,27 @@ if not SECRET_KEY:
 
 ALLOWED_HOSTS = env_list("DJANGO_ALLOWED_HOSTS", "localhost,127.0.0.1" if DEBUG else "")
 CSRF_TRUSTED_ORIGINS = env_list("DJANGO_CSRF_TRUSTED_ORIGINS")
+
+# Vercel build/çalışma ortamında VERCEL=1 tanımlıdır. Üretim ve önizleme adresleri sistem
+# değişkenlerinden okunur, böylece alan adı elle yazılmadan Host ve CSRF kontrolleri geçer.
+# (DJANGO_ALLOWED_HOSTS / DJANGO_CSRF_TRUSTED_ORIGINS ile özel alan adı da eklenebilir.)
+ON_VERCEL = env_bool("VERCEL")
+if ON_VERCEL:
+    for variable in ("VERCEL_PROJECT_PRODUCTION_URL", "VERCEL_URL", "VERCEL_BRANCH_URL"):
+        host = os.environ.get(variable, "").strip()
+        if host:
+            ALLOWED_HOSTS.append(host)
+            CSRF_TRUSTED_ORIGINS.append(f"https://{host}")
+
+# Canlı güvenlik ayarları: Vercel'de otomatik açılır, başka bir barındırmada DJANGO_SECURE=True ile.
+# Yerelde (DEBUG=False olsa bile http://localhost ile denenebilsin diye) kapalı kalır.
+if not DEBUG and env_bool("DJANGO_SECURE", ON_VERCEL):
+    SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
+    SECURE_SSL_REDIRECT = True
+    SESSION_COOKIE_SECURE = True
+    CSRF_COOKIE_SECURE = True
+    SECURE_CONTENT_TYPE_NOSNIFF = True
+    SECURE_HSTS_SECONDS = 31536000
 
 INSTALLED_APPS = [
     "django.contrib.admin",
