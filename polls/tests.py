@@ -1,13 +1,16 @@
 import re
 import uuid
+from datetime import timedelta
 
 from django.contrib.auth import get_user_model
 from django.db import connection
 from django.test import TestCase, override_settings
 from django.test.utils import CaptureQueriesContext
 from django.urls import path, reverse
+from django.utils import timezone
 
 from .models import Option, Poll, Vote
+from .views import POLL_LIMIT, POLL_LIMIT_WINDOW_HOURS
 from .voting import COOKIE_NAME
 
 User = get_user_model()
@@ -100,6 +103,57 @@ class CreatePollTests(TestCase):
         self.client.force_login(self.author)
         response = self.client.post(reverse("poll_create"), poll_data(options=["a" * 61, "b"]))
         self.assertEqual(response.status_code, 200)
+        self.assertEqual(Poll.objects.count(), 0)
+
+    def test_member_cannot_exceed_daily_poll_limit(self):
+        self.client.force_login(self.author)
+        for _ in range(POLL_LIMIT):
+            self.client.post(reverse("poll_create"), poll_data())
+        self.assertEqual(Poll.objects.count(), POLL_LIMIT)
+
+        response = self.client.post(reverse("poll_create"), poll_data())
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "en fazla 10 anket")
+        self.assertEqual(Poll.objects.count(), POLL_LIMIT)
+
+        # Sınır kişiye özeldir; başka bir üye etkilenmez.
+        self.client.force_login(make_user("baska"))
+        self.client.post(reverse("poll_create"), poll_data())
+        self.assertEqual(Poll.objects.count(), POLL_LIMIT + 1)
+
+    def test_daily_poll_limit_only_counts_recent_polls(self):
+        self.client.force_login(self.author)
+        for _ in range(POLL_LIMIT):
+            self.client.post(reverse("poll_create"), poll_data())
+        Poll.objects.update(created_at=timezone.now() - timedelta(hours=POLL_LIMIT_WINDOW_HOURS + 1))
+        self.client.post(reverse("poll_create"), poll_data())
+        self.assertEqual(Poll.objects.count(), POLL_LIMIT + 1)
+
+    def test_nul_control_and_invisible_characters_are_rejected(self):
+        self.client.force_login(self.author)
+        for bad in ("A\x00B", "A\x07B", "​", "A‮B", "‍"):
+            with self.subTest(option=bad):
+                response = self.client.post(reverse("poll_create"), poll_data(options=[bad, "Evet"]))
+                self.assertEqual(response.status_code, 200)
+                self.assertContains(response, "görünmez ya da kontrol karakterleri")
+        # Soruda tek başına birleştirici zararsızdır (yanında görünür metin var); diğerleri reddedilir.
+        for bad in ("A\x00B", "A\x07B", "​", "A‮B"):
+            with self.subTest(question=bad):
+                response = self.client.post(reverse("poll_create"), poll_data(f"Soru {bad} metni"))
+                self.assertEqual(response.status_code, 200)
+        self.assertEqual(Poll.objects.count(), 0)
+
+    def test_emoji_sequences_with_joiner_are_accepted(self):
+        self.client.force_login(self.author)
+        self.client.post(reverse("poll_create"), poll_data(options=["👨‍👩‍👧 Aile", "Yalnız"]))
+        self.assertEqual(Poll.objects.count(), 1)
+
+    def test_excess_option_fields_are_rejected_and_not_echoed(self):
+        self.client.force_login(self.author)
+        response = self.client.post(reverse("poll_create"), poll_data(options=[f"x{i}" for i in range(900)]))
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(len(response.context["form"].option_rows), 5)
+        self.assertNotContains(response, 'value="x899"')
         self.assertEqual(Poll.objects.count(), 0)
 
     def test_submitted_values_are_kept_on_error(self):

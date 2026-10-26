@@ -66,6 +66,7 @@ INSTALLED_APPS = [
     "django.contrib.humanize",
     "accounts",
     "polls",
+    "throttle",
 ]
 
 MIDDLEWARE = [
@@ -76,6 +77,7 @@ MIDDLEWARE = [
     "django.contrib.auth.middleware.AuthenticationMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
+    "throttle.middleware.ThrottleMiddleware",
 ]
 
 ROOT_URLCONF = "config.urls"
@@ -102,6 +104,9 @@ WSGI_APPLICATION = "config.wsgi.application"
 RUNNING_TESTS = len(sys.argv) > 1 and sys.argv[1] == "test"
 DATABASE_URL = "" if RUNNING_TESTS else os.environ.get("DATABASE_URL", "")
 USING_POSTGRES = DATABASE_URL.startswith(("postgres://", "postgresql://"))
+
+# Hız sınırı testlerde kapalıdır (testler aynı IP'den çok sayıda POST yapar); throttle/tests.py açar.
+THROTTLE_ENABLED = not RUNNING_TESTS
 
 # Supabase transaction pooler (6543): bağlantılar havuzda tutulmaz ve sunucu taraflı
 # imleçler kapatılır; Supabase SSL gerektirir (yerel Postgres için DATABASE_SSL_REQUIRE=False).

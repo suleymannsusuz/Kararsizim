@@ -76,6 +76,9 @@ END $$;
 
 Django, tabloların sahibi olan `postgres` rolüyle bağlandığı için RLS uygulamayı etkilemez. **Yeni bir migrasyon yeni tablo oluşturursa SQL'i tekrar çalıştır.** Ardından *Advisors → Security Advisor* sayfasında "RLS disabled" uyarısı kalmadığını doğrula.
 
+### Hız sınırı tablosu
+`throttle_ratelimithit` tablosu IP'nin tuzlu özetini ve zaman damgasını tutar (ham IP saklanmaz). Eski kayıtlar kendiliğinden silinir. Tablo bir migrasyonla gelir; Supabase'e `migrate` çalıştırıp yukarıdaki RLS adımını tekrarlamak yeterli.
+
 ### Notlar
 - Ücretsiz planda proje bir süre kullanılmazsa duraklatılabilir; ilk istek veritabanı uyanana kadar yavaş olabilir veya hata verebilir (panelden *Restore* edilir).
 - Transaction pooler IPv4 üzerinden çalışır. Doğrudan bağlantı (`db.<ref>.supabase.co:5432`) IPv6 gerektirebilir; kullanma.

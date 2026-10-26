@@ -1,0 +1,7 @@
+{% extends "base.html" %}
+
+{% block title %}Çok fazla istek · kararsızım{% endblock %}
+
+{% block content %}
+  {% include "partials/error_card.html" with code="429" title="Biraz yavaşla" text="Kısa sürede çok fazla istek gönderdin. Birkaç dakika bekleyip tekrar dene." %}
+{% endblock %}

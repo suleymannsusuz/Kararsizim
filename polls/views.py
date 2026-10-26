@@ -1,3 +1,5 @@
+from datetime import timedelta
+
 from django.contrib import messages
 from django.contrib.auth import get_user_model
 from django.contrib.auth.decorators import login_required
@@ -23,6 +25,8 @@ from .voting import (
 User = get_user_model()
 
 PAGE_SIZE = 20
+POLL_LIMIT = 10  # bir üyenin POLL_LIMIT_WINDOW_HOURS içinde açabileceği anket sayısı
+POLL_LIMIT_WINDOW_HOURS = 24
 SORT_POPULAR = "populer"
 SORT_CLOSED = "kapananlar"
 
@@ -65,9 +69,16 @@ def detail(request, pk):
 def create(request):
     form = PollForm(request.POST or None)
     if request.method == "POST" and form.is_valid():
-        poll = form.save(request.user)
-        messages.success(request, "Anketin yayında!")
-        return redirect(poll)
+        since = timezone.now() - timedelta(hours=POLL_LIMIT_WINDOW_HOURS)
+        if Poll.objects.filter(author=request.user, created_at__gte=since).count() >= POLL_LIMIT:
+            form.add_error(
+                None,
+                f"Son {POLL_LIMIT_WINDOW_HOURS} saatte en fazla {POLL_LIMIT} anket açabilirsin. Biraz sonra tekrar dene.",
+            )
+        else:
+            poll = form.save(request.user)
+            messages.success(request, "Anketin yayında!")
+            return redirect(poll)
     return render(request, "polls/create.html", {"form": form})
 
 
